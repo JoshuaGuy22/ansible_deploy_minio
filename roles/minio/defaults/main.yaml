@@ -5,5 +5,6 @@ minio_user: "minio-user"
 minio_group: "minio-user"
 minio_root_user: "minioadmin"
 minio_root_password: "minio-secret-key-CHANGE-ME" #This is default only - change using GroupVars 
-minio_console_address: ":9001"
+web_port: "9001"
+api_port: "9000"
 minio_disk_count: 45 
