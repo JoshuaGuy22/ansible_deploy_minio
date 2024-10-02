@@ -1,0 +1,36 @@
+### you can override any var set in roles/defaults/main.yaml here
+
+ansible_user: root
+
+### MinIO WEB GUI ###
+alias_name_web: minio
+web_domain: minio.my.domain.com
+web_url: "{{ 'https' if use_tls else 'http' }}://{{ web_domain }}"
+
+### MinIO API ###
+alias_name_api: minio-api
+api_domain: minio-api.my.domain.com
+api_url: "{{ 'https' if use_tls else 'http' }}://{{ api_domain }}"
+api_port: 9000
+web_port: 9001
+
+### TLS ### 
+use_tls: true  # Set to false if you don't want to use TLS
+
+### SSH ###
+private_ssh_key: /path/to/id_rsa
+public_ssh_key: /path/to/id_rsa.pub
+
+### MinIO Configs ###
+licence_path: /path/to/minio.license # all servers must access this path
+minio_volumes: "{{ 'https' if use_tls else 'http' }}://minio-server-{1...X}:{{ api_port }}/mnt/disk{1...Y}/minio" #assuming each server is named minio-server-{1..X} - Replace X and Y and adjust server name
+minio_disk_count: 45 #how many disks are in each minio server
+minio_root_user: "MINIO-ADMIN"
+# minio_root_password: "MINIO-PASSWORD" #This can be set via included role vars, or here
+minio_user: "minio-user"
+minio_group: "minio-group"
+minio_hosts: # Be sure to have IP/Name format as this will be used to generate /etc/hosts
+  - "192.168.1.2 minio-server-1"
+  - "192.168.1.3 minio-server-1"
+  - "192.168.1.4 minio-server-1"
+  - "192.168.1.5 minio-server-1"

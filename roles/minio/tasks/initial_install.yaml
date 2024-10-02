@@ -1,0 +1,132 @@
+---
+
+- name: Ensure all Minio disks are mounted
+  ansible.builtin.command:
+    cmd: mount -a
+  register: mount_result
+  changed_when: mount_result.rc == 0 and mount_result.stdout != ""
+  failed_when: mount_result.rc != 0
+  
+- name: Configure default SSH key for outgoing connections
+  blockinfile:
+    path: /etc/ssh/ssh_config
+    block: |
+      Host *
+        IdentityFile {{ private_ssh_key }}
+        IdentitiesOnly yes
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - Default SSH key"
+
+- name: Configure SSH key for all connections
+  ansible.builtin.set_fact:
+    ansible_ssh_private_key_file: "{{ private_ssh_key }}"
+
+- name: Add public key to authorized_keys on remote hosts
+  ansible.builtin.authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: "{{ lookup('file', '{{ public_ssh_key }}') }}"
+
+- name: Remove existing MinIO host entries from /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    state: absent
+    regexp: "{{ item.split(' ')[1] }}"  # Remove lines based on hostname
+  with_items: "{{ minio_hosts }}"
+  become: yes
+
+- name: Add MinIO host entries to /etc/hosts using blockinfile
+  blockinfile:
+    path: /etc/hosts
+    block: |
+      {% for host in minio_hosts %}
+      {{ host }}
+      {% endfor %}
+    marker: "# BEGIN MinIO Hosts - MANAGED BY ANSIBLE"
+  become: yes
+
+- name: Install required packages for MinIO
+  apt:
+    name:
+      - wget
+      - ntp
+    state: present
+  become: yes
+
+- name: Allow MinIO ports through UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  with_items:
+    - "{{ api_port }}"
+    - "{{ web_port }}"
+  become: yes
+
+- name: Download MinIO DEB file
+  get_url:
+    url: "https://dl.min.io/server/minio/release/linux-amd64/archive/minio_{{ minio_version }}_amd64.deb"
+    dest: "/tmp/minio.deb"
+  become: yes
+
+- name: Install MinIO
+  apt:
+    deb: /tmp/minio.deb
+  become: yes
+
+- name: Create MinIO group
+  group:
+    name: "{{ minio_group }}"
+    state: present
+  become: yes
+
+- name: Create MinIO user
+  user:
+    name: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    system: yes
+    shell: /sbin/nologin
+  become: yes
+
+- name: Create storage directories and assign ownership
+  file:
+    path: "/mnt/disk{{ item }}/minio"
+    state: directory
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: '0755'
+  with_sequence: start=1 end="{{ minio_disk_count }}"
+  become: yes
+
+- name: Deploy the MinIO systemd service
+  template:
+    src: minio.service.j2
+    dest: /usr/lib/systemd/system/minio.service
+  become: yes
+
+
+- name: Deploy MinIO environment file
+  template:
+    src: minio.env.j2
+    dest: /etc/default/minio
+  become: yes
+
+- name: Ensure correct permissions on /etc/default/minio
+  file:
+    path: /etc/default/minio
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: '0640'
+  become: yes
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Enable and start MinIO service
+  systemd:
+    name: minio
+    enabled: yes
+    state: restarted
+  become: yes
+

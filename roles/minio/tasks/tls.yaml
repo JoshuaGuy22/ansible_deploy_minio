@@ -1,0 +1,76 @@
+- name: Remove MinIO certs directory if TLS is disabled
+  file:
+    path: /home/{{ minio_user }}/.minio/certs
+    state: absent
+  become: yes
+  when: use_tls is defined and use_tls == false
+
+- name: Install certgen tool
+  get_url:
+    url: "https://github.com/minio/certgen/releases/download/v1.0.0/certgen-linux-amd64"
+    dest: "/usr/local/bin/certgen"
+    mode: '0755'
+  become: yes
+  when: use_tls is defined and use_tls == true
+
+- name: Ensure shared certificate directory exists for the current cluster
+  file:
+    path: /mnt/ps/home/CORP/administrator/configs/minio/{{ web_domain }}
+    state: directory
+    mode: '0755'
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+  become: yes
+  when: use_tls is defined and use_tls == true
+
+- name: Check if MinIO TLS private key exists in shared directory
+  stat:
+    path: /mnt/ps/home/CORP/administrator/configs/minio/{{ web_domain }}/private.key
+  register: private_key_stat
+  when: use_tls is defined and use_tls == true
+
+- name: Check if MinIO public certificate exists in shared directory
+  stat:
+    path: /mnt/ps/home/CORP/administrator/configs/minio/{{ web_domain }}/public.crt
+  register: public_cert_stat
+  when: use_tls is defined and use_tls == true
+
+- name: Set minio_hostnames fact based on minio_hosts
+  set_fact:
+    minio_hostnames: "{{ minio_hosts | map('regex_replace', '^.*\\s+', '') | list }}"
+
+- name: Generate MinIO self-signed certificates using certgen on first node
+  command: certgen -host "{{ minio_hostnames | join(',') }}"
+  args:
+    chdir: /mnt/ps/home/CORP/administrator/configs/minio/{{ web_domain }}
+  register: certgen_output
+  become: yes
+  when: use_tls is defined and use_tls == true and inventory_hostname == "{{ minio_hostnames[0] }}" and not private_key_stat.stat.exists and not public_cert_stat.stat.exists
+
+- name: Copy shared public certificate to all nodes
+  copy:
+    src: /mnt/ps/home/CORP/administrator/configs/minio/{{ web_domain }}/public.crt
+    dest: /home/{{ minio_user }}/.minio/certs/public.crt
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: '0644'
+    remote_src: yes
+  become: yes
+  when: use_tls is defined and use_tls == true
+
+- name: Copy shared private key to all nodes
+  copy:
+    src: /mnt/ps/home/CORP/administrator/configs/minio/{{ web_domain }}/private.key
+    dest: /home/{{ minio_user }}/.minio/certs/private.key
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: '0600'
+    remote_src: yes
+  become: yes
+  when: use_tls is defined and use_tls == true
+
+- name: Update CA certificates after copying
+  command: update-ca-certificates
+  become: yes
+  when: use_tls is defined and use_tls == true
+
