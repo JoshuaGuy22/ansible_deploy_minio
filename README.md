@@ -76,7 +76,7 @@ minio_root_user: "MINIO-ADMIN"
 # minio_root_password: "MINIO-PASSWORD" #This can be set via included role vars, or here
 minio_user: "minio-user"
 minio_group: "minio-group"
-minio_hosts:
+minio_hosts: # Be sure to have IP/Name format as this will be used to generate /etc/hosts
   - "192.168.1.2 minio-server-1"
   - "192.168.1.3 minio-server-1"
   - "192.168.1.4 minio-server-1"
