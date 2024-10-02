@@ -42,6 +42,11 @@ roles/minio/
   - Ensure all nodes can SSH w/o password to themselves (E.g. localhost)
 - Each node needs to have formatted XFS drives with the appropriate labels 
   - Run CREATE_XFS.sh before beginning MinIO installation and verify all drives are formatted with XFS and mounted
+  - This will automatically detect sd devices for use in MinIO
+    - My env had /dev/sd* devices for MinIO, the OS was on nvme. So I wanted to pull in all /dev/sd* devices for MinIO
+  - Please carfeully review the script and make sure it works for your env.
+  - !!!! THIS WILL FORMAT ALL /dev/sd* devices as the script currently stands !!!!
+
 
 ## Role Variables
 
