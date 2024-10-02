@@ -7,7 +7,7 @@ This Ansible role automates the deployment of MinIO in a Multi-Node Multi-Drive 
 
 ```
 Group Vars:
-/repo/bright-ansible/group_vars/
+/repo_dir/group_vars/
 
 Prerequisites:
 inventory.ini
