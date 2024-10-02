@@ -141,7 +141,7 @@ minio_hosts: # Be sure to have IP/Name format as this will be used to generate /
 
 
    ## Ingress/SSL using Kubernetes
-   - I use NGINX Ingress/Services along side Kubernetes/LetsEncrypt to route all traffic to minio.my.domain.com to the minio-server{1..X} IPs. T
+   - I use NGINX Ingress/Services along side Kubernetes/LetsEncrypt to route all traffic to minio.my.domain.com to the minio-server{1..X} IPs.
    - The Ansible Role will generate self-signed certificates if `use_tls` is set to true. However, I also use Kubernetes Ingress/Services for the full domain name routing/SSL certificates.
    - There may be other ways you can set up your ingress and certificates. You may need to adjust this role to fit your method.
    - If you also use Kubernetes/LetsEncrypt, I will provide the `yaml` below as an example:
