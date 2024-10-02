@@ -11,7 +11,7 @@ inventory.ini
 group_vars/
 └── minio_cluster_1.yaml
 roles/
-└── deply_minio.yaml
+└── deploy_minio.yaml
 
 Role:
 roles/minio/
