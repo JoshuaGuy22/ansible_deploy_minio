@@ -113,6 +113,7 @@ minio_hosts: # Be sure to have IP/Name format as this will be used to generate /
       minio_disk_count: 45
       minio_root_user: "ADMIN"
       minio_root_password: "ADMIN"
+      ... etc
       ```
 
 3. **Run the Playbook on First Node**
