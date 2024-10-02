@@ -1,0 +1,115 @@
+---
+### These are reccommended configs for Ubunutu 24.04 from MinIO support. Comment out this xfs_configs.yaml from roles/tasks/main.yaml if you want to skip
+
+- name: Find lines with incorrect noretry options for XFS mounts
+  shell: |
+    grep -E '^/dev/disk/by-label/disk[0-9]+ /mnt/disk[0-9]+ xfs defaults.*noretry' /etc/fstab || true
+  register: incorrect_lines
+  ignore_errors: yes
+  become: yes
+
+- name: Remove lines with noretry options for XFS mounts
+  lineinfile:
+    path: /etc/fstab
+    regexp: '^{{ item }}$'
+    state: absent
+  loop: "{{ incorrect_lines.stdout_lines }}"
+  when: incorrect_lines.stdout_lines is defined and incorrect_lines.stdout_lines | length > 0
+  become: yes
+  register: fstab_remove
+
+- name: Add corrected lines with only defaults option for XFS mounts
+  lineinfile:
+    path: /etc/fstab
+    line: "/dev/disk/by-label/disk{{ item }} /mnt/disk{{ item }} xfs defaults 0 0"
+    state: present
+  loop: "{{ query('sequence', 'start=1 end=' + minio_disk_count | string) }}"
+  when: fstab_remove.changed
+  become: yes
+  register: fstab_add
+
+- name: Check if any drives in fstab are not mounted
+  shell: |
+    awk '$3 == "xfs" && $1 ~ /^\/dev\/disk\/by-label\/disk[0-9]+/ {print $2}' /etc/fstab | while read -r mountpoint; do
+      if ! mountpoint -q "$mountpoint"; then
+        echo "$mountpoint";
+      fi;
+    done
+  register: unmounted_drives
+  ignore_errors: yes
+  become: yes
+
+- name: Mount unmounted drives listed in fstab
+  command: mount {{ item }}
+  loop: "{{ unmounted_drives.stdout_lines }}"
+  when: unmounted_drives.stdout_lines is defined and unmounted_drives.stdout_lines | length > 0
+  become: yes
+  register: mount_drives
+
+- name: Reload systemd daemon if fstab or mounts were changed
+  command: systemctl daemon-reload
+  when: fstab_add.changed or fstab_remove.changed or mount_drives.changed
+  become: yes
+
+- name: Build list of XFS mount points to remount
+  set_fact:
+    disk_mounts: "{{ query('sequence', 'start=1 end=' + minio_disk_count | string) | map('regex_replace', '^', '/mnt/disk') | list }}"
+
+- name: Remount XFS filesystems if fstab was changed
+  shell: mount -o remount {{ item }}
+  loop: "{{ disk_mounts }}"
+  when: fstab_add.changed or fstab_remove.changed
+  become: yes
+
+
+### XFS CONFIGS ### 
+
+- name: Find all XFS devices
+  shell: lsblk -o NAME,FSTYPE -n -r | awk '$2 == "xfs" {print $1}'
+  register: xfs_devices_output
+
+- name: Extract XFS devices from lsblk output
+  set_fact:
+    xfs_devices: "{{ xfs_devices_output.stdout_lines | select('string') | list }}"
+
+- name: Debug XFS devices
+  debug:
+    msg: "Detected XFS devices: {{ xfs_devices }}"
+
+- name: Find all max_retries paths for each XFS device
+  shell: |
+    for i in {{ xfs_devices | join(' ') }}; do
+      find /sys/fs/xfs/$i -type f -name "*max*";
+    done
+  register: max_retries_paths_output
+  ignore_errors: yes
+
+- name: Extract max_retries paths from find output
+  set_fact:
+    max_retries_paths: "{{ max_retries_paths_output.stdout_lines | select('string') | list }}"
+
+- name: Debug max_retries paths
+  debug:
+    msg: "Found max_retries paths: {{ max_retries_paths }}"
+
+- name: Disable retries for all errors except ENODEV if not already 0
+  shell: |
+    current_value=$(cat {{ item }});
+    if [ "$current_value" != "0" ]; then
+      echo 0 > {{ item }};
+    fi
+  loop: "{{ max_retries_paths }}"
+  become: yes
+  ignore_errors: no
+
+- name: Verify that retries are disabled
+  command: cat {{ item }}
+  loop: "{{ max_retries_paths }}"
+  register: verify_output
+  ignore_errors: yes
+
+- name: Display verification results
+  debug:
+    msg: "{{ item.item }}: {{ item.stdout }}"
+  loop: "{{ verify_output.results }}"
+  when: item.stdout is not none

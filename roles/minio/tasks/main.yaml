@@ -1,0 +1,8 @@
+- include_tasks: xfs_configs.yaml # optional
+- include_tasks: iommu.yaml # optional 
+- include_tasks: tls.yaml # if use_tls=false, this will be skipped automatically
+- include_tasks: initial_install.yaml
+- include_tasks: configs.yaml # optional
+- include_tasks: licence.yaml # optional
+
+

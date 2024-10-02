@@ -1,0 +1,80 @@
+---
+# tasks/licence.yaml
+
+- name: Set MinIO API alias using mc command
+  shell: |
+    /root/minio-binaries/mc alias set {{ alias_name_api }} {{ api_url }} {{ minio_root_user }} {{ minio_root_password }}
+  args:
+    executable: /bin/bash
+  register: alias_api_output
+  ignore_errors: yes
+  become: yes
+
+- name: Display API alias set output
+  debug:
+    msg: "{{ alias_api_output.stdout }}"
+
+- name: Register MinIO license
+  shell: |
+    /root/minio-binaries/mc license register --license {{ licence_path }} {{ alias_name_api }}
+  args:
+    executable: /bin/bash
+  register: license_output
+  ignore_errors: yes
+  become: yes
+
+- name: Display license registration output
+  debug:
+    msg: "{{ license_output.stdout }}"
+
+- name: Register MinIO license with hoss-api
+  shell: |
+    /root/minio-binaries/mc license register hoss-api
+  args:
+    executable: /bin/bash
+  register: license_hoss_api_output
+  ignore_errors: yes
+  become: yes
+
+- name: Display hoss-api license registration output
+  debug:
+    msg: "{{ license_hoss_api_output.stdout }}"
+
+- name: Enable callhome support with diagnostics for API alias
+  shell: |
+    /root/minio-binaries/mc support callhome enable --diag {{ alias_name_api }}
+  args:
+    executable: /bin/bash
+  register: callhome_output
+  ignore_errors: yes
+  become: yes
+
+- name: Display callhome enable output
+  debug:
+    msg: "{{ callhome_output.stdout }}"
+
+# - name: Enable performance support for API alias
+#   shell: |
+#     /root/minio-binaries/mc support perf {{ alias_name_api }}
+#   args:
+#     executable: /bin/bash
+#   register: perf_output
+#   ignore_errors: yes
+#   become: yes
+
+# - name: Display performance support output
+#   debug:
+#     msg: "{{ perf_output.stdout }}"
+
+# - name: Enable profiling support for API alias
+#   shell: |
+#     /root/minio-binaries/mc support profile {{ alias_name_api }}
+#   args:
+#     executable: /bin/bash
+#   register: profile_output
+#   ignore_errors: yes
+#   become: yes
+
+# - name: Display profiling support output
+#   debug:
+#     msg: "{{ profile_output.stdout }}"

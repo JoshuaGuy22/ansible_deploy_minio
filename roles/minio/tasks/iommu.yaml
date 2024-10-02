@@ -1,0 +1,67 @@
+---
+### These are reccommended configs for Ubunutu 24.04 from MinIO support. Comment out this iommu.yaml from roles/tasks/main.yaml if you want to skip
+
+- name: Check the current IOMMU settings
+  command: cat /proc/cmdline
+  register: cmdline_output
+  ignore_errors: yes
+
+- name: Detect CPU vendor
+  shell: lscpu | grep "Vendor ID" | awk '{print $3}'
+  register: cpu_vendor
+  ignore_errors: yes
+
+- name: Set the required IOMMU parameters based on the detected CPU vendor
+  set_fact:
+    iommu_setting: "{{ 'iommu=pt intel_iommu=off' if 'GenuineIntel' in cpu_vendor.stdout else 'iommu=pt amd_iommu=off' }}"
+
+- name: Check if the IOMMU setting is already correct
+  set_fact:
+    iommu_needs_update: "{{ not (cmdline_output.stdout is search(iommu_setting)) }}"
+
+- name: Update GRUB configuration if IOMMU settings need changes
+  block:
+    - name: Backup GRUB configuration
+      copy:
+        src: /etc/default/grub
+        dest: /etc/default/grub.bak
+        mode: 0644
+
+    - name: Update GRUB with the new IOMMU settings
+      lineinfile:
+        path: /etc/default/grub
+        regexp: '^GRUB_CMDLINE_LINUX_DEFAULT=".*"'
+        line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash {{ iommu_setting }}"'
+        backup: yes
+      when: iommu_needs_update
+
+    - name: Update GRUB settings
+      command: update-grub
+      when: iommu_needs_update
+
+- name: Check if the system uses EFI
+  stat:
+    path: /sys/firmware/efi
+  register: efi_check
+
+- name: Check if kernelstub command exists
+  command: which kernelstub
+  register: kernelstub_check
+  ignore_errors: yes
+
+- name: Update EFI kernel command line
+  lineinfile:
+    path: /etc/kernel/cmdline
+    line: "{{ iommu_setting }}"
+    create: yes
+    backup: yes
+  when: efi_check.stat.exists and iommu_needs_update
+
+- name: Update EFI boot settings using kernelstub if available
+  command: kernelstub -v
+  when: efi_check.stat.exists and iommu_needs_update and kernelstub_check.rc == 0
+
+- name: Reboot the system to apply changes
+  reboot:
+    msg: "Rebooting to apply IOMMU settings"
+  when: iommu_needs_update

@@ -6,9 +6,6 @@ This Ansible role automates the deployment of MinIO in a Multi-Node Multi-Drive 
 ## Role Structure
 
 ```
-Group Vars:
-/repo_dir/group_vars/
-
 Prerequisites:
 inventory.ini
 group_vars/

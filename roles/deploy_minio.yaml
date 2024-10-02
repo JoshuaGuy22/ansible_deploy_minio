@@ -1,0 +1,13 @@
+---
+- hosts: minio_cluster_1
+  pre_tasks:
+    - name: Include Vars
+      include_vars: /path/to/minio.vars #this is not required, you can set the password/vars in group_vars instead. 
+  become: yes
+  roles:
+    - minio
+
+### Example minio.vars ###
+# cat minio.vars
+# minio_root_password: my_super_secret_password
+

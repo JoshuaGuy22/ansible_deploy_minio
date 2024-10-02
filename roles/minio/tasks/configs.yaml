@@ -1,0 +1,62 @@
+---
+### These are reccommended configs for Ubunutu 24.04 from MinIO support. Comment out this configs.yaml from roles/tasks/main.yaml if you want to skip
+
+- name: Set transparent huge pages to "madvise"
+  ansible.builtin.command: echo "madvise" > /sys/kernel/mm/transparent_hugepage/enabled
+  args:
+    warn: false
+
+- name: Set transparent huge page defrag to "defer+madvise"
+  ansible.builtin.command: echo "defer+madvise" > /sys/kernel/mm/transparent_hugepage/defrag
+  args:
+    warn: false
+
+- name: Set transparent huge page max_ptes_none to 0
+  ansible.builtin.command: echo "0" > /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none
+  args:
+    warn: false
+
+- name: Determine the architecture of the host
+  ansible.builtin.shell: uname -m
+  register: arch_result
+  changed_when: false
+
+- name: Set download URL for mc based on architecture
+  set_fact:
+    mc_download_url: >
+      {{ 'https://dl.min.io/client/mc/release/linux-amd64/mc' if arch_result.stdout == 'x86_64' else
+          'https://dl.min.io/client/mc/release/linux-ppc64le/mc' if arch_result.stdout == 'ppc64le' else
+          'https://dl.min.io/client/mc/release/linux-arm64/mc' if arch_result.stdout == 'aarch64' else '' }}
+
+- name: Ensure mc binaries directory exists
+  ansible.builtin.file:
+    path: "{{ ansible_env.HOME }}/minio-binaries"
+    state: directory
+    mode: '0755'
+
+- name: Download mc binary
+  ansible.builtin.get_url:
+    url: "{{ mc_download_url }}"
+    dest: "{{ ansible_env.HOME }}/minio-binaries/mc"
+    mode: '0755'
+  when: mc_download_url != ''
+
+- name: Add mc to PATH
+  ansible.builtin.lineinfile:
+    path: "{{ ansible_env.HOME }}/.bashrc"
+    line: 'export PATH=$PATH:{{ ansible_env.HOME }}/minio-binaries/'
+    create: yes
+
+# - name: Display mc installation output
+#   debug:
+#     msg: "{{ mc_help.stdout }}"
+
+# - name: Enable callhome support with diagnostics for MinIO alias
+#   ansible.builtin.shell:
+#     cmd: mc support callhome enable --diag {{ alias_name }}
+#   args:
+#     warn: false
+#   register: callhome_output
+#   ignore_errors: yes
+#   become: yes
+
