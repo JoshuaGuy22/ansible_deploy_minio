@@ -86,7 +86,7 @@ minio_hosts: # Be sure to have IP/Name format as this will be used to generate /
 - `minio_disk_count`: The number of disks (can vary depending on the cluster).
 - `minio_root_user`: The root user for MinIO.
 - `minio_root_password`: The root password for MinIO.
-- `minio_console_address`: The port for the MinIO console.
+- `web_port`: The port for the MinIO console.
 
 ## Usage
 1. **Define Inventory and Group Vars**
