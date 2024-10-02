@@ -137,3 +137,158 @@ minio_hosts: # Be sure to have IP/Name format as this will be used to generate /
    systemctl status minio
    ```
    The role will deploy MinIO, configure systemd, and create necessary directories and permissions, as well as set up /etc/hosts.
+
+
+
+   ## Ingress/SSL using Kubernetes
+   - I use NGINX Ingress/Services along side Kubernetes/LetsEncrypt to route all traffic to minio.my.domain.com to the minio-server{1..X} IPs. T
+   - The Ansible Role will generate self-signed certificates if `use_tls` is set to true. However, I also use Kubernetes Ingress/Services for the full domain name routing/SSL certificates.
+   - There may be other ways you can set up your ingress and certificates. You may need to adjust this role to fit your method.
+   - If you also use Kubernetes/LetsEncrypt, I will provide the `yaml` below as an example:
+  
+     ```
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: minio-cluster
+        labels:
+          app: minio-cluster
+      spec:
+        ports:
+          - protocol: TCP
+            name: http
+            port: 443
+            targetPort: 9001
+      ---
+      apiVersion: v1
+      kind: Endpoints
+      metadata:
+        name: minio-cluster
+      subsets:
+        - addresses:
+            - ip: 192.168.1.2
+              hostname: minio-server-1
+            - ip: 192.168.1.3
+              hostname: minio-server-2
+            - ip: 192.168.1.4
+              hostname: minio-server-3
+            - ip: 192.168.1.5
+              hostname: minio-server-4
+          ports:
+            - port: 9001
+              name: http
+      ---
+      apiVersion: "networking.k8s.io/v1"
+      kind: Ingress
+      metadata:
+        name: minio-cluster
+        labels:
+          app: minio-cluster
+        annotations:
+          kubernetes.io/ingress.class: "nginx"
+          cert-manager.io/cluster-issuer: "letsencrypt"
+          nginx.ingress.kubernetes.io/proxy-body-size: 160m
+          nginx.ingress.kubernetes.io/client-body-size: "160m"
+          nginx.ingress.kubernetes.io/proxy-connect-timeout: 60s
+          nginx.ingress.kubernetes.io/proxy-read-timeout: 1800s
+          nginx.ingress.kubernetes.io/proxy-send-timeout: 1800s
+          nginx.org/client-max-body-size: 160m
+          nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          nginx.ingress.kubernetes.io/configuration-snippet: |
+            more_set_headers "X-Forwarded-Proto: https";
+            more_set_headers "X-Forwarded-Ssl: on";
+          nginx.ingress.kubernetes.io/websocket-services: "minio-cluster"
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" #remove if not using HTTPS
+          nginx.ingress.kubernetes.io/secure-backends: "true" #remove if not using HTTPS 
+      
+      spec:
+        tls:
+          - hosts:
+              - minio.my.domain.com
+            secretName: minio-cluster-tls
+        rules:
+          - host: minio.my.domain.com
+            http:
+              paths:
+                - path: /
+                  pathType: ImplementationSpecific
+                  backend:
+                    service:
+                      name: minio-cluster
+                      port:
+                        number: 443
+      
+      ---
+      
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: minio-cluster-api
+        labels:
+          app: minio-cluster-api
+      spec:
+        ports:
+          - protocol: TCP
+            name: http
+            port: 443
+            targetPort: 9000
+      ---
+      apiVersion: v1
+      kind: Endpoints
+      metadata:
+        name: minio-cluster-api
+      subsets:
+        - addresses:
+            - ip: 192.168.1.2
+              hostname: minio-server-1
+            - ip: 192.168.1.3
+              hostname: minio-server-2
+            - ip: 192.168.1.4
+              hostname: minio-server-3
+            - ip: 192.168.1.5
+              hostname: minio-server-4
+          ports:
+            - port: 9000
+              name: http
+      ---
+      apiVersion: "networking.k8s.io/v1"
+      kind: Ingress
+      metadata:
+        name: minio-cluster-api
+        labels:
+          app: minio-cluster-api
+        annotations:
+          kubernetes.io/ingress.class: "nginx"
+          cert-manager.io/cluster-issuer: "letsencrypt"
+          nginx.ingress.kubernetes.io/proxy-body-size: 160m
+          nginx.ingress.kubernetes.io/client-body-size: "160m"
+          nginx.ingress.kubernetes.io/proxy-connect-timeout: 60s
+          nginx.ingress.kubernetes.io/proxy-read-timeout: 1800s
+          nginx.ingress.kubernetes.io/proxy-send-timeout: 1800s
+          nginx.org/client-max-body-size: 160m
+          nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+          nginx.ingress.kubernetes.io/ssl-redirect: "true"
+          nginx.ingress.kubernetes.io/configuration-snippet: |
+            more_set_headers "X-Forwarded-Proto: https";
+            more_set_headers "X-Forwarded-Ssl: on";
+          nginx.ingress.kubernetes.io/websocket-services: "minio-cluster-api"
+          nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" #remove if not using HTTPS
+          nginx.ingress.kubernetes.io/secure-backends: "true" #remove if not using HTTPS 
+      spec:
+        tls:
+          - hosts:
+              - minio-api.my.domain.com
+            secretName: minio-cluster-api-tls
+        rules:
+          - host: minio-api.my.domain.com
+            http:
+              paths:
+                - path: /
+                  pathType: ImplementationSpecific
+                  backend:
+                    service:
+                      name: minio-cluster-api
+                      port:
+                        number: 443
+     ```
