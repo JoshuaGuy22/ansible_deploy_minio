@@ -1,5 +1,5 @@
 
-# MinIO (HOSS) Ansible Role
+# MinIO Ansible Role
 
 This Ansible role automates the deployment of MinIO in a Multi-Node Multi-Drive (MNMD) configuration. It handles the installation of MinIO, configuration of systemd services, creation of storage directories, and ensures secure permissions on environment files. The role also allows flexibility for deploying different clusters by setting up variables in `group_vars`.
 
@@ -102,7 +102,7 @@ minio_hosts:
    
 2. **Define `group_vars/minio_cluster_1.yaml` with MinIO-specific settings**:
 
-   *Example: group_vars/hoss_hq.yml*:
+   *Example: group_vars/minio-cluster-1.yml*:
       ```yaml
       minio_volumes: "http://minio-server-{1...4}:9000/mnt/disk{1..45}/minio"
       minio_disk_count: 45
